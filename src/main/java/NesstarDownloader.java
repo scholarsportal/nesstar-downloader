@@ -187,17 +187,28 @@ public final class NesstarDownloader {
       }
    }
 
+   private void downloadFile(Study study, FileFormat format) {
+      try {
+         ResultStream rs = study.download(format, null);
+         File targetFile = new File("CORA/" + study.getId() + "_" + format.toString() + ".zip");
+         java.nio.file.Files.copy(
+                 rs,
+                 targetFile.toPath(),
+                 StandardCopyOption.REPLACE_EXISTING);
+      } catch (Exception e) {
+         logger.log(Level.SEVERE,"Cannot download or save " + study.getId()+ " " + format.toString() ,  e);
+      }
+   }
+
    private  void downloadSPSS(Study study) {
       //Create SPSS file
       try {
          if (study.hasData()) {
-            ResultStream rsSPSS = study.download(FileFormat.SPSS, null);
-            File targetFileSPSS = new File("CORA/" + study.getId() + ".zip");
-
-            java.nio.file.Files.copy(
-                    rsSPSS,
-                    targetFileSPSS.toPath(),
-                    StandardCopyOption.REPLACE_EXISTING);
+            downloadFile(study, FileFormat.SPSS);
+            downloadFile(study, FileFormat.STATA);
+            downloadFile(study, FileFormat.STATA7);
+            downloadFile(study, FileFormat.CSV);
+            downloadFile(study, FileFormat.SAS);
          } else {
             System.out.println(study.getId());
          }
