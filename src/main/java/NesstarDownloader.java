@@ -8,10 +8,16 @@ import java.util.Scanner;
 import java.util.logging.*;
 
 
+
+import org.json.simple.JSONArray;
+import org.json.simple.*;
+import org.json.simple.parser.JSONParser;
+
 import com.nesstar.api.*;
 import com.nesstar.api.search.SearchQuery;
 import com.nesstar.api.search.SearchResult;
 import com.nesstar.api.search.SearchResultItem;
+
 
 import javax.xml.xpath.XPathExpressionException;
 
@@ -166,18 +172,19 @@ public final class NesstarDownloader {
       File coraFile = new File(coraIdsFile);
       Scanner myReader = new Scanner(coraFile);
       while (myReader.hasNextLine()) {
-         String id = myReader.nextLine();
+         String id = myReader.nextLine().trim();
          coraIds.add(id);
       }
       myReader.close();
 
       return coraIds;
    }
-   private void downloadXML(Study study) {
+   private void downloadXML(Study study, String directory) {
       //Create xml file
       try {
          ResultStream rs = study.getDDI();
-         File targetFile = new File("CORA/" + study.getId() + ".xml");
+         logger.info(directory + "/" + study.getId() + ".xml");
+         File targetFile = new File(directory + "/" + study.getId() + ".xml");
          java.nio.file.Files.copy(
                  rs,
                  targetFile.toPath(),
@@ -187,10 +194,10 @@ public final class NesstarDownloader {
       }
    }
 
-   private void downloadFile(Study study, FileFormat format) {
+   private void downloadFile(Study study, FileFormat format, String directory) {
       try {
          ResultStream rs = study.download(format, null);
-         File targetFile = new File("CORA/" + study.getId() + "_" + format.toString() + ".zip");
+         File targetFile = new File(directory + "/" + study.getId() + "_" + format.toString() + ".zip");
          java.nio.file.Files.copy(
                  rs,
                  targetFile.toPath(),
@@ -200,15 +207,15 @@ public final class NesstarDownloader {
       }
    }
 
-   private  void downloadSPSS(Study study) {
+   private  void downloadSPSS(Study study, String directory) {
       //Create SPSS file
       try {
          if (study.hasData()) {
-            downloadFile(study, FileFormat.SPSS);
-            downloadFile(study, FileFormat.STATA);
-            downloadFile(study, FileFormat.STATA7);
-            downloadFile(study, FileFormat.CSV);
-            downloadFile(study, FileFormat.SAS);
+            downloadFile(study, FileFormat.SPSS, directory);
+            downloadFile(study, FileFormat.STATA, directory);
+            downloadFile(study, FileFormat.STATA7, directory);
+            downloadFile(study, FileFormat.CSV, directory);
+            downloadFile(study, FileFormat.SAS, directory);
          } else {
             System.out.println(study.getId());
          }
@@ -225,7 +232,27 @@ public final class NesstarDownloader {
          Handler fileHandler  = null;
          NesstarDownloader nesstarDownloader;
 
-         fileHandler  = new FileHandler("./nesstarDownloader.log" );
+         // parsing file "JSONExample.json"
+         JSONParser parser = new JSONParser();
+         Object obj = parser.parse(new FileReader("config.json"));
+
+         //Object obj = new JSONParser().parse(new FileReader("config.json"));
+
+         // typecasting obj to JSONObject
+         JSONObject jo = (JSONObject) obj;
+
+         // getting firstName and lastName
+         String filename = (String) jo.get("file");
+         String directory = (String) jo.get("directory");
+         String uri = (String) jo.get("uri");
+         String log =  (String) jo.get("log");
+
+         System.out.println(uri);
+         System.out.println(directory);
+         System.out.println(filename);
+
+         //fileHandler  = new FileHandler("./nesstarDownloader.log" );
+         fileHandler  = new FileHandler(log);
          fileHandler.setLevel(Level.ALL);
 
 
@@ -235,15 +262,22 @@ public final class NesstarDownloader {
          fileHandler.setFormatter(formatter);
          logger.info("Started");
 
-         ArrayList<String> coraIds = readStudiesId("./cora_all.txt");
-         nesstarDownloader = new NesstarDownloader(new URI("http://odesi2.scholarsportal.info"));
+         //ArrayList<String> coraIds = readStudiesId("./cora_all.txt");
+         ArrayList<String> coraIds = readStudiesId(filename);
+         //nesstarDownloader = new NesstarDownloader(new URI("http://odesi2.scholarsportal.info"));
+         nesstarDownloader = new NesstarDownloader(new URI(uri));
          Bank bank = nesstarDownloader.server.getBank(Study.class);
          for (String id: coraIds) {
+            logger.info("Before bank");
             Study study = (Study) bank.get(id);
             if (study != null) {
-               nesstarDownloader.downloadXML(study);
-               nesstarDownloader.downloadSPSS(study);
+               logger.info(directory);
+               id = study.getId();
+               logger.info("_" + id + "_" );
+               nesstarDownloader.downloadXML(study, directory);
+               nesstarDownloader.downloadSPSS(study, directory);
             } else {
+
                logger.log(Level.SEVERE, "No study with id: " + id);
             }
          }
